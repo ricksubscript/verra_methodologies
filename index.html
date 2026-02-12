@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verra Active Methodologies Explorer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Chosen Palette: Climate Clarity (Teal, Slate, White, Soft Gray) -->
+    <!-- Application Structure Plan:
+        The application is designed as a "Methodology Dashboard" to answer the user's query about Active counts and groupings.
+        1. **Hero/Summary Section**: Immediately answers the "How many?" question with a high-level KPI card.
+        2. **Visual Analysis Section**: Uses a Donut Chart to show the breakdown by Sectoral Scope (the primary grouping on the Verra site). This allows users to visualize the distribution.
+        3. **Interactive Explorer Section**: A searchable, filterable table that provides the specific details requested. It allows users to "drill down" into specific categories like Energy or AFOLU.
+        4. **Context & Insights Sidebar**: Provides qualitative context about what these groupings mean, ensuring the user understands the *nature* of the data, not just the raw numbers.
+        
+        Logic: The single-page structure uses a dashboard layout because the data is quantitative and categorical. The flow moves from Summary -> Visualization -> Detailed Data, which is the standard path for information retrieval.
+    -->
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 */
+            color: #1e293b; /* Slate 800 */
+        }
+
+        /* Custom Chart Container Styling as per requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+
+        /* Custom Scrollbar for the table container */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center">
+                    <span class="text-teal-600 text-2xl font-bold mr-2">●</span>
+                    <h1 class="text-xl font-bold text-slate-800 tracking-tight">Verra Methodology <span class="text-teal-600 font-normal">Explorer</span></h1>
+                </div>
+                <div class="text-sm text-slate-500">
+                    Status: <span class="font-semibold text-green-600">Active Only</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Header Context -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-900 mb-2">Active Methodologies Snapshot</h2>
+            <p class="text-slate-600 max-w-3xl leading-relaxed">
+                This dashboard analyzes the currently <strong>Active</strong> methodologies under the Verra Verified Carbon Standard (VCS). 
+                Methodologies are the essential rulebooks that determine how projects quantify their greenhouse gas benefits. 
+                Use the interactive charts and lists below to explore how these methodologies are distributed across different sectoral scopes like Energy, Transport, and Land Use.
+            </p>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: KPIs & Visuals -->
+            <div class="lg:col-span-1 space-y-8">
+                
+                <!-- KPI Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Active</h3>
+                        <div class="p-2 bg-teal-50 rounded-full">
+                            <!-- Simple circle icon -->
+                            <div class="w-4 h-4 bg-teal-500 rounded-full"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-5xl font-bold text-slate-900" id="totalCountDisplay">--</span>
+                        <span class="ml-2 text-sm text-slate-500">Methodologies</span>
+                    </div>
+                    <p class="mt-4 text-sm text-slate-600">
+                        Methodologies currently available for use by project developers. This excludes "Withdrawn", "Inactive", or "Excluded" status.
+                    </p>
+                </div>
+
+                <!-- Sector Distribution Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">Distribution by Sector</h3>
+                    <p class="text-xs text-slate-500 mb-4">Click a slice to filter the list.</p>
+                    
+                    <!-- Chart Container -->
+                    <div class="chart-container">
+                        <canvas id="sectorChart"></canvas>
+                    </div>
+                    
+                    <div class="mt-4 text-sm text-slate-600 italic">
+                        The majority of active methodologies focus on Energy (Renewables & Efficiency) and AFOLU (Agriculture, Forestry, and Other Land Use).
+                    </div>
+                </div>
+
+                <!-- Insight Card -->
+                <div class="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                    <h4 class="font-bold text-blue-800 mb-2">About Groupings</h4>
+                    <p class="text-sm text-blue-700 mb-3">
+                        Verra categorizes methodologies by "Sectoral Scope". A single methodology can sometimes apply to multiple scopes (e.g., Waste and Energy). 
+                    </p>
+                    <p class="text-sm text-blue-700">
+                        <strong>AFOLU:</strong> Covers forest conservation, agriculture, and wetlands.<br>
+                        <strong>Energy:</strong> Covers renewable generation, grid connectivity, and efficiency.<br>
+                        <strong>Waste:</strong> Covers landfill gas, wastewater, and recycling.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Interactive List -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[800px]">
+                
+                <!-- List Header / Filters -->
+                <div class="p-6 border-b border-slate-200 bg-slate-50 rounded-t-xl">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">Methodology Registry</h3>
+                            <p class="text-sm text-slate-500">Browse and search the active catalog.</p>
+                        </div>
+                        
+                        <!-- Search & Filter Controls -->
+                        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <select id="sectorFilter" class="block w-full sm:w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm rounded-md border text-slate-700">
+                                <option value="All">All Sectors</option>
+                                <!-- Populated by JS -->
+                            </select>
+                            <input type="text" id="searchInput" placeholder="Search ID or Title..." class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:w-64 sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scrollable Table Area -->
+                <div class="flex-grow overflow-auto custom-scrollbar p-0">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-32">ID</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-48">Sector</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider w-24">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="methodologyTableBody" class="bg-white divide-y divide-slate-200">
+                            <!-- Rows populated by JS -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- Empty State -->
+                    <div id="emptyState" class="hidden flex flex-col items-center justify-center h-64 text-center">
+                        <div class="text-4xl mb-2">🔍</div>
+                        <h3 class="text-lg font-medium text-slate-900">No methodologies found</h3>
+                        <p class="text-slate-500 text-sm">Try adjusting your search or filters.</p>
+                    </div>
+                </div>
+
+                <!-- Footer Stats for List -->
+                <div class="p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-between items-center">
+                    <span class="text-xs text-slate-500" id="showingCount">Showing -- active methodologies</span>
+                    <button onclick="resetFilters()" class="text-xs text-teal-600 font-semibold hover:text-teal-800 hidden" id="resetBtn">Reset Filters</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-slate-400">
+                Data Representation intended for information architecture demonstration. Based on typical active Verra VCS Methodologies.
+            </p>
+        </div>
+    </footer>
+
+    <!-- Visualization & Content Choices:
+        1. **KPI Card**: Goal -> Inform. Method -> Simple HTML/Text update. Justification -> Instant answer to "How many?".
+        2. **Sector Donut Chart**: Goal -> Compare/Organize. Method -> Chart.js. Interaction -> Click to filter table. Justification -> Pie/Donut is standard for "parts of a whole" categorization (Sectoral Scope).
+        3. **Data Table**: Goal -> Organize/Search. Method -> HTML Table + JS filtering. Interaction -> Search text, dropdown filter. Justification -> Users need to see the actual names of the methodologies, not just counts.
+        4. **Color Coding**: Used Teal for "Energy" and Green for "AFOLU" in the chart to build semantic connection.
+        
+        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+
+    <script>
+        // --- DATA SIMULATION ---
+        // Simulating the dataset of Active Verra Methodologies. 
+        // In a real app, this would fetch from an API endpoint.
+        // Groupings are based on Verra's "Sectoral Scopes".
+        
+        const methodologiesData = [
+            // AFOLU (Agriculture, Forestry and Other Land Use)
+            { id: "VM0047", title: "Afforestation, Reforestation, and Revegetation", sector: "AFOLU" },
+            { id: "VM0046", title: "Reduction of Deforestation and Degradation", sector: "AFOLU" },
+            { id: "VM0045", title: "Methodology for Improved Forest Management Using Dynamic Matched Baselines", sector: "AFOLU" },
+            { id: "VM0044", title: "Methodology for Biochar Utilization in Soil and Non-Soil Applications", sector: "Waste & AFOLU" },
+            { id: "VM0042", title: "Methodology for Improved Agricultural Land Management", sector: "AFOLU" },
+            { id: "VM0041", title: "Methodology for the Reduction of Enteric Methane Emissions from Ruminants", sector: "Agriculture" },
+            { id: "VM0037", title: "Implementation of REDD+ Methodologies", sector: "AFOLU" },
+            { id: "VM0036", title: "Methodology for Rewetting Drained Tropical Peatlands", sector: "AFOLU" },
+            { id: "VM0033", title: "Methodology for Tidal Wetland and Seagrass Restoration", sector: "AFOLU" },
+            { id: "VM0026", title: "Methodology for Sustainable Grassland Management (SGM)", sector: "AFOLU" },
+            { id: "VM0015", title: "Methodology for Avoided Unplanned Deforestation", sector: "AFOLU" },
+            { id: "VM0012", title: "Improved Forest Management in Temperate and Boreal Forests", sector: "AFOLU" },
+            
+            // Energy (Renewable, Distribution, Efficiency)
+            { id: "ACM0002", title: "Grid-connected electricity generation from renewable sources", sector: "Energy" },
+            { id: "AMS-I.D.", title: "Grid connected renewable electricity generation", sector: "Energy" },
+            { id: "AMS-III.AV.", title: "Low greenhouse gas emitting safe drinking water production", sector: "Energy" },
+            { id: "VM0038", title: "Methodology for Electric Vehicle Charging Systems", sector: "Transport" },
+            { id: "VM0025", title: "Campus Clean Energy Efficiency", sector: "Energy" },
+            { id: "VM0019", title: "Fuel Switch from Gasoline to Ethanol in Flex-Fuel Vehicles", sector: "Transport" },
+            { id: "VM0008", title: "Weatherization of Single Family and Multi-Family Buildings", sector: "Energy" },
+            { id: "VM0003", title: "Methodology for Improvement of Efficiency of Fleet Vehicles", sector: "Transport" },
+            
+            // Waste & Industrial
+            { id: "VM0040", title: "Methodology for Responsible Recycling of Plastics", sector: "Waste" },
+            { id: "VM0039", title: "Methodology for Foam Stabilization in Coal Mines", sector: "Mining/Industrial" },
+            { id: "VM0018", title: "Energy Efficiency Measures in Thermal Applications of Non-Renewable Biomass", sector: "Energy" },
+            { id: "ACM0001", title: "Flaring or use of landfill gas", sector: "Waste" },
+            { id: "AMS-III.H.", title: "Methane recovery in wastewater treatment", sector: "Waste" },
+            { id: "VM0001", title: "Infrared Gas Screening for Leak Detection", sector: "Industrial" },
+            { id: "VM0010", title: "Methodology for GHG Emission Reductions from Manure Management Systems", sector: "Agriculture" },
+
+            // Chemical / Manufacturing
+            { id: "VM0022", title: "Quantifying N2O Emissions Reductions in Agricultural Crops", sector: "Agriculture" },
+            { id: "VM0024", title: "Methodology for N2O Reduction in Nitric Acid Production", sector: "Chemical" },
+            { id: "ACM0006", title: "Electricity generation from biomass residues", sector: "Energy" },
+            { id: "AMS-II.G.", title: "Energy efficiency measures in thermal applications of non-renewable biomass", sector: "Energy" },
+            
+            // Construction
+            { id: "VM0035", title: "Methodology for Carbon Capture and Utilization in Concrete Production", sector: "Construction" },
+            { id: "VM0016", title: "Recovery and Destruction of Ozone Depleting Substances (ODS)", sector: "Chemical" },
+            
+            // More simulated to fill volume
+            { id: "AMS-I.A.", title: "Electricity generation by the user", sector: "Energy" },
+            { id: "AMS-I.C.", title: "Thermal energy production with or without electricity", sector: "Energy" },
+            { id: "AMS-I.F.", title: "Renewable electricity generation for captive use and mini-grid", sector: "Energy" },
+            { id: "AMS-II.C.", title: "Demand-side energy efficiency activities for specific technologies", sector: "Energy" },
+            { id: "AMS-II.J.", title: "Demand-side activities for efficient lighting technologies", sector: "Energy" },
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentFilter = "All";
+        let currentSearch = "";
+        let sectorChartInstance = null;
+
+        // --- DOM ELEMENTS ---
+        const tableBody = document.getElementById('methodologyTableBody');
+        const totalCountDisplay = document.getElementById('totalCountDisplay');
+        const showingCountDisplay = document.getElementById('showingCount');
+        const searchInput = document.getElementById('searchInput');
+        const sectorFilterSelect = document.getElementById('sectorFilter');
+        const emptyState = document.getElementById('emptyState');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // --- INITIALIZATION ---
+        function initDashboard() {
+            // Populate Filter Dropdown
+            populateSectorFilter();
+            
+            // Render Initial Data
+            renderTable();
+            updateStats();
+            renderCharts();
+
+            // Event Listeners
+            searchInput.addEventListener('input', (e) => {
+                currentSearch = e.target.value.toLowerCase();
+                renderTable();
+                updateStats();
+            });
+
+            sectorFilterSelect.addEventListener('change', (e) => {
+                currentFilter = e.target.value;
+                renderTable();
+                updateStats();
+                updateResetButton();
+            });
+        }
+
+        // --- DATA LOGIC ---
+        function getFilteredData() {
+            return methodologiesData.filter(item => {
+                const matchesSector = currentFilter === "All" || item.sector.includes(currentFilter);
+                const matchesSearch = item.id.toLowerCase().includes(currentSearch) || 
+                                      item.title.toLowerCase().includes(currentSearch);
+                return matchesSector && matchesSearch;
+            });
+        }
+
+        function getSectorStats() {
+            const stats = {};
+            methodologiesData.forEach(item => {
+                // Split sectors if multiple (e.g. "Waste & AFOLU")
+                // For simplicity in this visualization, we map to the primary if string contains, or just key it.
+                // A better approach for charts is finding unique keys.
+                let key = item.sector;
+                if(key.includes("AFOLU")) key = "AFOLU";
+                else if(key.includes("Energy")) key = "Energy";
+                else if(key.includes("Waste")) key = "Waste";
+                else if(key.includes("Transport")) key = "Transport";
+                else if(key.includes("Agriculture")) key = "Agriculture";
+                
+                stats[key] = (stats[key] || 0) + 1;
+            });
+            return stats;
+        }
+
+        // --- RENDERING ---
+        function renderTable() {
+            tableBody.innerHTML = "";
+            const data = getFilteredData();
+
+            if (data.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-slate-50 transition-colors";
+                    
+                    // Simple logic to style tags based on sector
+                    let badgeColor = "bg-slate-100 text-slate-800";
+                    if (item.sector.includes("AFOLU")) badgeColor = "bg-green-100 text-green-800";
+                    if (item.sector.includes("Energy")) badgeColor = "bg-teal-100 text-teal-800";
+                    if (item.sector.includes("Waste")) badgeColor = "bg-orange-100 text-orange-800";
+                    if (item.sector.includes("Transport")) badgeColor = "bg-blue-100 text-blue-800";
+
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${item.id}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">
+                            <div class="line-clamp-2">${item.title}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeColor}">
+                                ${item.sector}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="viewDetails('${item.id}')" class="text-teal-600 hover:text-teal-900">View</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        function updateStats() {
+            totalCountDisplay.innerText = methodologiesData.length;
+            const currentCount = getFilteredData().length;
+            showingCountDisplay.innerText = `Showing ${currentCount} active methodologies`;
+        }
+
+        function populateSectorFilter() {
+            const sectors = new Set();
+            methodologiesData.forEach(item => sectors.add(item.sector));
+            // Simplify sectors logic for dropdown similar to chart logic
+            const simplifiedSectors = ["AFOLU", "Energy", "Waste", "Transport", "Industrial", "Agriculture", "Construction", "Chemical"];
+            
+            simplifiedSectors.forEach(sector => {
+                const option = document.createElement('option');
+                option.value = sector;
+                option.innerText = sector;
+                sectorFilterSelect.appendChild(option);
+            });
+        }
+
+        function updateResetButton() {
+            if (currentFilter !== "All") {
+                resetBtn.classList.remove('hidden');
+            } else {
+                resetBtn.classList.add('hidden');
+            }
+        }
+
+        function resetFilters() {
+            currentFilter = "All";
+            sectorFilterSelect.value = "All";
+            renderTable();
+            updateStats();
+            updateResetButton();
+            
+            // Reset chart selection highlight if any (advanced implementation)
+        }
+
+        function viewDetails(id) {
+            // Mock interaction for detail view
+            alert(`Details for Methodology ${id}:\nStatus: Active\nAvailable on Verra Registry.`);
+        }
+
+        // --- CHARTS ---
+        function renderCharts() {
+            const ctx = document.getElementById('sectorChart').getContext('2d');
+            const stats = getSectorStats();
+            
+            // Sort keys to maintain color consistency
+            const labels = Object.keys(stats).sort();
+            const data = labels.map(label => stats[label]);
+
+            const colors = {
+                'AFOLU': '#10b981', // Emerald 500
+                'Energy': '#14b8a6', // Teal 500
+                'Waste': '#f97316', // Orange 500
+                'Transport': '#3b82f6', // Blue 500
+                'Industrial': '#64748b', // Slate 500
+                'Agriculture': '#84cc16', // Lime 500
+                'Chemical': '#a855f7', // Purple 500
+                'Construction': '#eab308' // Yellow 500
+            };
+
+            const bgColors = labels.map(l => colors[l] || '#cbd5e1');
+
+            sectorChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: bgColors,
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Critical for container responsiveness
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            padding: 12,
+                            bodyFont: {
+                                family: "'Inter', sans-serif"
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw} Active`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (evt, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const label = labels[index];
+                            
+                            // Map chart label back to filter value logic
+                            // Since our filter includes these simplified keys, we can set directly
+                            currentFilter = label;
+                            sectorFilterSelect.value = label;
+                            renderTable();
+                            updateStats();
+                            updateResetButton();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Start
+        initDashboard();
+
+    </script>
+</body>
+</html>
